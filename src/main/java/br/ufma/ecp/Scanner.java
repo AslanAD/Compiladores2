@@ -1,24 +1,23 @@
 package br.ufma.ecp;
 
+import static br.ufma.ecp.token.TokenType.*;
+
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 import br.ufma.ecp.token.Token;
 import br.ufma.ecp.token.TokenType;
-import static br.ufma.ecp.token.TokenType.EOF;
-import static br.ufma.ecp.token.TokenType.IDENT;
-import static br.ufma.ecp.token.TokenType.ILLEGAL;
-import static br.ufma.ecp.token.TokenType.NUMBER;
 
 public class Scanner {
 
     private byte[] input;
     private int current;
     private int start;
+    private int line = 1;
 
     private static final Map<String, TokenType> keywords;
- 
+
 
     static {
         keywords = new HashMap<>();
@@ -45,21 +44,62 @@ public class Scanner {
         keywords.put("return", TokenType.RETURN);
     }
 
-    
+
     public Scanner (byte[] input) {
         this.input = input;
         current = 0;
         start = 0;
     }
 
+    private void skipBlockComments() {
+        boolean endComment = false;
+        advance();
+        while (!endComment) {
+            advance();
+            char ch = peek();
+            if (ch == '\n')
+                line++;
+            if ( ch == 0) { // eof, lexical error
+                System.exit(1);
+            }
+
+            if (ch == '*') {
+                for (ch = peek(); ch == '*';  advance(), ch = peek()) ;
+                if (ch == '/') {
+                    endComment = true;
+                    advance();
+                }
+            }
+
+        }
+    }
+
+    private void skipLineComments() {
+        for (char ch = peek(); ch != '\n' && ch != 0; advance(), ch = peek())
+            if (ch == '\n')
+                line++;
+    }
+
     private void skipWhitespace() {
         char ch = peek();
         while (ch == ' ' || ch == '\r' || ch == '\t' || ch == '\n') {
+
+            if (ch == '\n')
+                line++;
+
             advance();
             ch = peek();
         }
     }
-    
+
+    private char peekNext () {
+        int next = current + 1;
+        if ( next  < input.length) {
+            return (char)input[next];
+        } else {
+            return 0;
+        }
+    }
 
     public Token nextToken () {
 
@@ -77,6 +117,62 @@ public class Scanner {
         }
 
         switch (ch) {
+
+            case '*':
+                advance();
+                return new Token (TokenType.ASTERISK,"*");
+            case '.':
+                advance();
+                return new Token (TokenType.DOT,".");
+            case '&':
+                advance();
+                return new Token (TokenType.AND,"&");
+            case '|':
+                advance();
+                return new Token (TokenType.OR,"|");
+            case '~':
+                advance();
+                return new Token (TokenType.NOT,"~");
+
+            case '>':
+                advance();
+                return new Token (TokenType.GT,">");
+            case '<':
+                advance();
+                return new Token (TokenType.LT,"<");
+            case '=':
+                advance();
+                return new Token (TokenType.EQ,"=");
+            case '(':
+                advance();
+                return new Token (TokenType.LPAREN,"(");
+            case ')':
+                advance();
+                return new Token (TokenType.RPAREN,")");
+            case '{':
+                advance();
+                return new Token (TokenType.LBRACE,"{");
+            case '}':
+                advance();
+                return new Token (TokenType.RBRACE,"}");
+            case '[':
+                advance();
+                return new Token (TokenType.LBRACKET,"[");
+            case ']':
+                advance();
+                return new Token (TokenType.RBRACKET,"]");
+            case ';':
+                advance();
+                return new Token (TokenType.SEMICOLON,";");
+            case ',':
+                advance();
+                return new Token (TokenType.COMMA,",");
+            case '+':
+                advance();
+                return new Token(TokenType.PLUS, "+");
+            case '-':
+                advance();
+                return new Token (MINUS,"-");
             case '/':
                 if (peekNext() == '/') {
                     skipLineComments();
@@ -89,62 +185,6 @@ public class Scanner {
                     advance();
                     return new Token (TokenType.SLASH,"/");
                 }
-            case '+':
-                advance();
-                return new Token (TokenType.PLUS,"+");
-            case '-':
-                advance();
-                return new Token (TokenType.MINUS,"-"); 
-            case '*':
-                advance();
-                return new Token (TokenType.ASTERISK,"*"); 
-            case '.':
-                advance();
-                return new Token (TokenType.DOT,"."); 
-            case '&':
-                advance();
-                return new Token (TokenType.AND,"&"); 
-            case '|':
-                advance();
-                return new Token (TokenType.OR,"|"); 
-            case '~':
-                advance();
-                return new Token (TokenType.NOT,"~"); 
-
-            case '>':
-                advance();
-                return new Token (TokenType.GT,">"); 
-            case '<':
-                advance();
-                return new Token (TokenType.LT,"<"); 
-            case '=':
-                advance();
-                return new Token (TokenType.EQ,"="); 
-        
-            case '(':
-                advance();
-                return new Token (TokenType.LPAREN,"("); 
-            case ')':
-                advance();
-                return new Token (TokenType.RPAREN,")"); 
-            case '{':
-                advance();
-                return new Token (TokenType.LBRACE,"{"); 
-            case '}':
-                advance();
-                return new Token (TokenType.RBRACE,"}"); 
-            case '[':
-                advance();
-                return new Token (TokenType.LBRACKET,"["); 
-            case ']':
-                advance();
-                return new Token (TokenType.RBRACKET,"]"); 
-            case ';':
-                advance();
-                return new Token (TokenType.SEMICOLON,";"); 
-            case ',':
-                advance();
-                return new Token (TokenType.COMMA,",");
             case '"':
                 return string();
             case 0:
@@ -168,9 +208,9 @@ public class Scanner {
         while (Character.isDigit(peek())) {
             advance();
         }
-        
-            String num = new String(input, start, current-start, StandardCharsets.UTF_8)  ;
-            return new Token(NUMBER, num);
+
+        String num = new String(input, start, current-start, StandardCharsets.UTF_8)  ;
+        return new Token(NUMBER, num);
     }
 
     private Token string () {
@@ -194,51 +234,21 @@ public class Scanner {
 
     private boolean isAlpha(char c) {
         return (c >= 'a' && c <= 'z') ||
-               (c >= 'A' && c <= 'Z') ||
+                (c >= 'A' && c <= 'Z') ||
                 c == '_';
-      }
-    
-      private boolean isAlphaNumeric(char c) {
+    }
+
+    private boolean isAlphaNumeric(char c) {
         return isAlpha(c) || Character.isDigit((c));
-      }
-    
+    }
+
 
     private char peek () {
         if (current < input.length)
-           return (char)input[current];
-       return 0;
-    }
-    private char peekNext() {
-        int next = current + 1;
-        if (next < input.length) {
-            return (char) input[next];
-        } else {
-            return 0;
-        }
-    }
-    private void skipLineComments() {
-        for (char ch = peek(); ch != '\n' && ch != 0; advance(), ch = peek());
+            return (char)input[current];
+        return 0;
     }
 
-    private void skipBlockComments() {
-        boolean endComment = false;
-        advance(); // Consume '*'
-        while (!endComment) {
-            advance();
-            char ch = peek();
-            if (ch == 0) { // EOF, lexical error
-                System.exit(1);
-            }
 
-            if (ch == '*') {
-                for (ch = peek(); ch == '*'; advance(), ch = peek());
-                if (ch == '/') {
-                    endComment = true;
-                    advance(); // Consume '/'
-                }
-            }
-        }
-    }
-    
- 
+
 }
