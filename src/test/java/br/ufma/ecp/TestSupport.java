@@ -11,5 +11,5 @@ public class TestSupport {
         return Files.readString(Paths.get("src/test/resources/"+ path));
     }
 
-    
+
 }
